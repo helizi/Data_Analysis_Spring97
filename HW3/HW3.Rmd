@@ -1,0 +1,156 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,comment = "",error = F,message = F,
+                      warning = F,fig.width = 10,fig.height = 6,fig.align = "center")
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(highcharter)
+library(devtools)
+library(engsoccerdata)
+
+```
+#Q1
+```{r}
+laliga = as.tbl(spain)
+table <- rbind(laliga %>% select(Season, team = home, opp = visitor, GF = hgoal, GA = vgoal,Date), laliga %>% select(Season, team = visitor, opp = home, GF = vgoal, GA = hgoal,Date)) %>% arrange(Date)
+table %>% mutate(GD = GF-GA) %>% group_by(team,Season) %>% summarize(GP = n(),
+            goalsF = sum(GF),
+            goalsA = sum(GA),
+            goaldif = sum(GD),
+            W = sum(GD>0),
+            D = sum(GD==0)
+) %>%  mutate(score = W*3 + D) %>% arrange(Season,desc(score)) %>% group_by(Season) %>%  mutate(rank = rank(-score*100000 - goaldif*1000 - goalsF) %>% as.integer()) -> scoretable
+bestteamperyear <- scoretable %>% group_by(Season) %>% filter(rank == 1) 
+gg <- bestteamperyear %>% group_by(team) %>% summarise(cnt = n()) %>% arrange(desc(cnt))
+bestteamplot <- ggplot(bestteamperyear) + geom_bar(aes(x = team, y = rank), stat = "identity") + theme(axis.text.x = element_text(angle = 90, hjust = 1))
+bestteamplot 
+hchart(gg, "column", hcaes(x = team, y = cnt))
+
+```
+#Q2
+```{r}
+laliga = as.tbl(spain)
+tableboring <- rbind(laliga %>% select(Season, team = home, opp = visitor, GF = hgoal, GA = vgoal,Date), laliga %>% select(Season, team = visitor, opp = home, GF = vgoal, GA = hgoal,Date)) %>% arrange(Date)
+borings <- tableboring %>% filter(GA == 0, GF == 0) %>% group_by(team) %>% mutate(cnt = n()) %>% 
+  arrange(desc(cnt)) 
+selected <- borings %>% select(team = team, cnt = cnt)
+selected<- selected[!duplicated(selected),] 
+top10 <-selected[1:10,]
+ggplot(top10) + geom_bar(aes(x = team, y = cnt), stat = "identity")+   labs(y = "Number of 0-0 equal") +  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+hchart(top10, "column", hcaes(x = team, y = cnt)) %>%  hc_yAxis(title = list(text = "Number of 0-0 equal"))
+
+boringseasons <- tableboring %>% filter(GA == 0, GF == 0) %>% group_by(Season) %>% mutate(cnt = n()) %>% 
+  arrange(desc(cnt))
+selecteds <- boringseasons %>% select(year = Season, cnt = cnt)
+selecteds<- selecteds[!duplicated(selecteds),] 
+top10s <-selecteds[1:10,]
+top10s$year
+ggplot(top10s) + geom_bar(aes(x = year, y = cnt), stat = "identity")  + labs(y = "Number of 0-0 equal") +  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+hchart(top10s, "column", hcaes(x = year, y = cnt)) %>%  hc_yAxis(title = list(text = "Number of 0-0 equal"))
+
+```
+#Q3
+```{r}
+grouped <- table %>% group_by(Season) %>% mutate(count = ave(team ==team, team, FUN = cumsum))
+numberofgames <- grouped %>% group_by(Season) %>% mutate(number = max(count))
+numberofgames %>% mutate(GD = GF-GA) %>% group_by(team,Season) %>% filter(count <= number/2) %>% summarize(GP = n(),
+            goalsF = sum(GF),
+            goalsA = sum(GA),
+            goaldif = sum(GD),
+            W = sum(GD>0),
+            D = sum(GD==0)
+) %>%  mutate(score = W*3 + D) %>% arrange(Season,desc(score)) %>% group_by(Season) %>%  mutate(rank = rank(-score*100000 - goaldif*1000 - goalsF) %>% as.integer()) -> scoretablemidseason
+bestteammidseason <- scoretablemidseason %>% group_by(Season) %>% filter(rank == 1) 
+comparechampion <- data.frame(cbind(midseason = bestteammidseason$team, allseason = bestteamperyear$team,year = bestteammidseason$Season))
+ans <- nrow(comparechampion[as.character(comparechampion$midseason) == as.character(comparechampion$allseason),])/nrow(comparechampion) *100
+ans
+```
+
+#Q4
+<p dir = "rtl">
+گربه سیاه بر اساس تیم ضعیفی که بیشترین دفعهی برد سه تیم قوی بارسلونا، رءال مادرید و اتلتیکو را داشته است به دست آمده است.
+</p>
+```{r}
+print("Barcelona Black Cat:")
+bestfive <- gg[1:5,]
+qbarcelona <- table %>% filter(Season > 2000 & Season < 2011 & team == "FC Barcelona" & GF < GA) %>% filter(!(opp %in% bestfive$team)) %>% group_by(opp) %>% summarise(n = n(), ) %>% arrange(desc(n))
+qbarcelona[1,]$opp
+print("Real Madrid Black Cat:")
+qrealmadrid <- table %>% filter(Season > 2000 & Season < 2011 & team == "Real Madrid" & GF < GA) %>% filter(!(opp %in% bestfive$team)) %>% group_by(opp) %>% summarise(n = n(), ) %>% arrange(desc(n))
+qrealmadrid[1,]$opp
+print("Atletico Madrid Black Cat:")
+qathleticomadrid <- table %>% filter(Season > 2000 & Season < 2011 & team == "Atletico Madrid" & GF < GA) %>% filter(!(opp %in% bestfive$team)) %>% group_by(opp) %>% summarise(n = n(), ) %>% arrange(desc(n))
+qathleticomadrid[1,]$opp
+
+
+
+
+```
+#Q5
+a:
+```{r}
+ourtable <- table %>% group_by(Season) %>% mutate(count = ave(team ==team, team, FUN = cumsum))
+tablewithrank <- ourtable %>% mutate(GD = GF-GA) %>% group_by(team,Season) %>% mutate(
+            goalsF = cumsum(GF),
+            goalsA = cumsum(GA), 
+            goaldif = cumsum(GD),
+            W = cumsum(GD>0),
+            D = cumsum(GD==0)
+) %>%  mutate(score = W*3 + D) %>% group_by(Season,count) %>%  mutate(rank = rank(-score*100000 - goaldif*1000 - goalsF) %>% as.integer()) %>% arrange(Season, count,rank) %>% group_by(Season) %>% mutate(weeks = max(count)) %>%   select(Season, count, rank, weeks,score,team)
+merge(tablewithrank %>% filter(rank == 1), tablewithrank %>% filter(rank == 2), by= c("Season","count","weeks")) %>% group_by(Season) %>%  arrange(count) %>% filter((score.x - score.y) > (weeks - count)*3) %>% filter(1:n() == 1) %>% mutate(ekhtelaf = as.integer(weeks - count)) ->earliestwin
+earliestwin %>% filter(ekhtelaf == max(earliestwin$ekhtelaf))
+```
+#Q5
+b
+```{r}
+ourtable <- table %>% group_by(Season) %>% mutate(count = ave(team ==team, team, FUN = cumsum))
+tablewithrank <- ourtable %>% mutate(GD = GF-GA) %>% group_by(team,Season) %>% mutate(
+            goalsF = cumsum(GF),
+            goalsA = cumsum(GA), 
+            goaldif = cumsum(GD),
+            W = cumsum(GD>0),
+            D = cumsum(GD==0)
+) %>%  mutate(score = W*3 + D) %>% group_by(Season,count) %>%  mutate(rank = rank(-score*100000 - goaldif*1000 - goalsF) %>% as.integer()) %>% arrange(Season, count,rank) %>% group_by(Season) %>% mutate(weeks = max(count)) %>%   select(Season, count, rank, weeks,score,team)
+merge(tablewithrank %>% filter(rank == 1), tablewithrank %>% filter(rank == 2), by= c("Season","count","weeks")) %>%  arrange(count) %>% filter((score.x - score.y) == max(score.x - score.y)) %>% filter(count == weeks) ->powerfulwin
+powerfulwin
+```
+#Q6
+```{r}
+
+```
+
+#Q7
+```{r}
+merge(tablewithrank %>% group_by(Season) %>%  filter(rank == weeks/2 + 1), tablewithrank %>% group_by(Season) %>% filter(rank == weeks/2 - 2), by= c("Season","count","weeks")) %>% group_by(Season) %>%  arrange(count) %>% filter((score.y - score.x) > (weeks - count)*3) %>% filter(1:n() == 1) %>% mutate(ekhtelaf = as.integer(weeks - count)) -> earliestdown
+earliestdown %>% filter(ekhtelaf == max(earliestdown$ekhtelaf))
+
+```
+#Q8
+```{r}
+newtable <- rbind(laliga %>% select(Season,Date, team = home, opp = visitor, GF = hgoal, GA = vgoal), laliga %>% select(Season, Date, team = visitor, opp = home, GF = vgoal, GA = hgoal)) %>% arrange(Date)
+newtable <- newtable %>% filter(Season == 1998) %>% mutate(count = ave(team ==team, team, FUN = cumsum))
+newtable <- newtable %>% mutate(GD = GF-GA) %>% group_by(team,Season) %>% mutate(
+            goalsF = cumsum(GF),
+            goalsA = cumsum(GA), 
+            goaldif = cumsum(GD),
+            W = cumsum(GD>0),
+            D = cumsum(GD==0)
+) %>%  mutate(score = W*3 + D) %>% group_by(count) %>%  mutate(rank = rank(-score*100000 - goaldif*1000 - goalsF) %>% as.integer()) %>% select(Date, count, rank,score,team)
+newtable %>% hchart(type = "line",hcaes(x = count, y = rank, group = team)) %>% hc_xAxis(title = list(text = "week"))
+```
+```{r}
+year2012 <- laliga %>% filter(Season == 2012)
+ggplot(year2012, aes(home, visitor)) + geom_tile(fill = "White", color = "Black") + theme(axis.text.x = element_text(angle = 90, hjust = 1)) + geom_text(aes(label = FT))
+
+```
+```{r}
+table %>% group_by(Season, team) %>% 
+```
+

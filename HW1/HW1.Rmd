@@ -1,0 +1,215 @@
+---
+title: "Data_Analysis_HW1_94104778"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+##Q1
+
+```{r}
+require(magic)
+magic(3)
+magic(4)
+magic(5)
+```
+
+##Q2
+
+```{r}
+library(gtools)
+x <- 1:13
+firstfive <- permutations(13, 5, 1:13)
+firstfiveSelected = matrix(ncol = 5, nrow = 0)
+k = 1
+n = nrow(firstfive)
+for (i in 1:n){
+  if (firstfive[i,1]*(firstfive[i,3]+firstfive[i,4]+firstfive[i,5])==(firstfive[i,2]+firstfive[i,3])^2)
+    {
+    firstfiveSelected <- rbind(firstfiveSelected, firstfive[i,])
+    k = k + 1
+  }
+}
+firsttenselected = matrix(ncol=10,nrow=0)
+for (i in 1:nrow(firstfiveSelected)){
+  newElement <- x[! x %in% firstfiveSelected[i,]]
+  secondfour <- permutations(8,5,newElement)
+  for (j in 1:nrow(secondfour)){
+    if (secondfour[j,1] * (secondfour[j,2] + secondfour[j,3] + secondfour[j,4]) == (secondfour[j,1] + secondfour[j,2])^2){
+      if (secondfour[j,1] * (firstfiveSelected[i,5] + secondfour[j,4] + secondfour[j,5]) == (secondfour[j,2] + secondfour[j,1]) * (secondfour[j,2] + secondfour[j,3] + secondfour[j,4])){
+        firsttenselected <- rbind(firsttenselected, c(firstfiveSelected[i,], secondfour[j, ]))
+      }
+    }
+  }
+}
+for (j in 1:nrow(firsttenselected)){
+  newnewelement <-x[! x %in% firsttenselected[j,]]
+  lastthree <- permutations(3,3,newnewelement)
+  for (i in 1:nrow(lastthree)){
+    if((lastthree[i,1] + lastthree[i,2]) * (lastthree[i,3] + firsttenselected[j,10]) == (lastthree[i,2] + lastthree[i,3])^2){
+      answer = c(firsttenselected[j,],lastthree[i,])
+    }
+  }
+}
+answer
+```
+##Q3
+#part1
+```{r}
+for (i in 0:65535) {
+  bit=vector("numeric", 16)
+  x=i
+  for(j in 15:0){
+    if((2**j)<=x){
+      bit[j+1]=1
+      x= x - (2**j)
+    }
+    else{
+      bit[j+1]=0
+    }
+  }
+  valid = 1
+  for(j in 1:16){
+    left=j-1
+    right=j+1
+    if(left == 0){
+      left=16;
+    }
+    if(right==17){
+      right=1;
+    }
+    if(bit[j]==1 && (bit[left]==1 || bit[right]==1)){
+      valid=0
+    }
+    if(bit[j]==0 && (bit[left]==0 || bit[right]==0)){
+      valid=0
+    }
+  }
+  cnt=0
+  for(j in 1:16){
+    if(bit[j]){
+      cnt = cnt + 1
+    }
+  }
+  if(valid){
+    print(cnt)
+  }
+}
+```
+#part2
+```{r}
+for (i in 0:4095) {
+  bit=vector("numeric", 12)
+  x=i
+  for(j in 11:0){
+    if((2**j)<=x){
+      bit[j+1]=1
+      x= x - (2**j)
+    }
+    else{
+      bit[j+1]=0
+    }
+  }
+  valid = 1
+  for(j in 1:12){
+    left=j-1
+    right=j+1
+    if(left == 0){
+      left=12;
+    }
+    if(right==13){
+      right=1;
+    }
+    if(bit[j]==1 && ((bit[left]==0 && bit[right]==1)||(bit[left]==1 && bit[right]==0))){
+      valid=0
+    }
+    if(bit[j]==0 && ((bit[left]==0 && bit[right]==0)||(bit[left]==1 && bit[right]==1))){
+      valid=0
+    }
+  }
+  cnt=0
+  for(j in 1:12){
+    if(bit[j]){
+      cnt = cnt + 1
+    }
+  }
+  if(valid){
+    print(cnt)
+  }
+}
+```
+#part3
+```{r}
+for (i in 0:255) {
+  bit=vector("numeric", 8)
+  x=i
+  for(j in 7:0){
+    if((2**j)<=x){
+      bit[j+1]=1
+      x= x - (2**j)
+    }
+    else{
+      bit[j+1]=0
+    }
+  }
+  val=0
+  for(k in 0:255){
+    new_bit=vector("numeric", 8)
+    x=k
+    num=0
+    valid = 1
+    for(j in 7:0){
+      if((2**j)<=x){
+        new_bit[j+1]=1
+        x= x - (2**j)
+        num = num + 1
+      }
+      else{
+        new_bit[j+1]=0
+      }
+    }
+    if(num !=4){
+      valid = 0
+    }
+    for(j in 1:8){
+      left=j-1
+      right=j+1
+      if(left == 0){
+        left=8;
+      }
+      if(right==9){
+        right=1;
+      }
+      if(new_bit[j]==1 && bit[j]==1 && ((bit[left]==1 && bit[right]==0)||(bit[left]==0 && bit[right]==1))){
+        valid=0
+      }
+      if(new_bit[j]==1 && bit[j]==0 && ((bit[left]==1 && bit[right]==1)||(bit[left]==0 && bit[right]==0))){
+        valid=0
+      }
+      if(new_bit[j]==0 && bit[j]==1 && (bit[left]==1 && bit[right]==1)){
+        valid=0
+      }
+      if(new_bit[j]==0 && bit[j]==0 && (bit[left]==0 || bit[right]==0)){
+        valid=0
+      }
+    }
+    if(valid){
+      val=1
+    }
+  }
+  cnt=0
+  for(j in 1:8){
+    if(bit[j]){
+      cnt = cnt + 1
+    }
+  }
+  if(val){
+    print(cnt)
+  }
+}
+```
+

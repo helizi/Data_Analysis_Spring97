@@ -1,0 +1,125 @@
+---
+title: "HW11 94104778"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(plotly)
+library(readr)
+library(ggplot2)
+library(highcharter)
+library(dplyr)
+library(maps)
+library(ggmap)
+library(rworldmap)
+library(lubridate)
+library(gganimate)
+```
+
+##Q1
+```{r}
+data <- readRDS("~/Downloads/week_11/data/historical_web_data_26112015.rds")
+plot_ly(data, x = data$Latitude, y = data$Longitude, z = data$Depth, size = data$Magnitude) %>%  layout(scene = list(xaxis = list(title = 'Latitude'), yaxis = list(title = 'Longitude'), zaxis = list(title = 'Depth')))
+```
+
+
+##Q2
+
+```{r message=FALSE, warning=FALSE}
+bigEQ = read_delim('~/Downloads/week_11/data/disaster.txt', '\t', escape_double = FALSE, trim_ws = TRUE)
+sunami = bigEQ %>% filter(FLAG_TSUNAMI == 'Tsu')
+sunami = sunami[!is.na(sunami$EQ_PRIMARY),]
+sunami = sunami %>% filter(EQ_PRIMARY >= 8)
+worldMap = map_data('world')
+ggplot() + geom_polygon(data = worldMap, aes(x = long, y = lat, group = group),fill = 'blue') + geom_point(data = sunami, aes(x = LONGITUDE, y = LATITUDE), color = 'orange', size = 0.3) + transition_time(EQ_PRIMARY) + labs(title = 'mag {frame_time}') + ease_aes('linear')
+      
+```
+
+##Q3
+
+```{r}
+iranEQ <- readRDS("~/Downloads/week_11/data/iran_earthquake.rds")
+ggmap(read_rds("~/Downloads/week_11/data/Tehrn_map_6.rds")) + stat_density_2d(geom = 'polygon', data = iranEQ, aes(x = Long, y = Lat, fill = ..level.., alpha = ..level..))
+```
+
+##Q4
+<p dir='rtl'>
+زلزله بزرگ را زلزله با قدرت بیشتر از ۶.۷ ریشتر در نظر گرفتیم.
+</p>
+```{r}
+irBig = bigEQ %>% filter(EQ_PRIMARY > 6 & COUNTRY == 'IRAN')
+distanceYear = data.frame(irBig[-1,]$YEAR - irBig[-nrow(irBig),]$YEAR)
+colnames(distanceYear) = c('year')
+notHappened = distanceYear %>% filter(year > 5)
+cat(1 - nrow(notHappened)/nrow(distanceYear))
+```
+
+
+##Q5
+
+```{r}
+meannumeq <- bigEQ %>% group_by(COUNTRY) %>% summarise(numberOfEQ = n(), meanDeath = sum(DEATHS,na.rm = T)/numberOfEQ, alldeath = sum(DEATHS,na.rm = T))
+mapDevice('x11')
+heatMap = joinCountryData2Map(meannumeq, joinCode="NAME", nameJoinColumn="COUNTRY")
+mapCountryData(heatMap, nameColumnToPlot="alldeath")
+```
+
+##Q6
+
+```{r}
+fittedLine <- lm(bigEQ, formula = DEATHS ~  LONGITUDE + LATITUDE + FOCAL_DEPTH + EQ_PRIMARY )
+summary(fittedLine)
+```
+
+##Q7
+
+```{r}
+worldEQ = read.csv('~/Downloads/week_11/data/worldwide.csv')
+worldEQ$date = as_date(worldEQ$time)
+worldEQ$ID = interaction(day(worldEQ$date), year(worldEQ$date), month(worldEQ$date), sep='') 
+worldEQ$country = sub(".*, ", "", worldEQ$place)
+left = worldEQ %>% group_by(country, ID) %>% filter(mag == max(mag))
+right = worldEQ %>% group_by(country, ID) %>% mutate(ind = rank(desc(mag))) %>% arrange(ind) %>% filter(ind == 2)
+inter = inner_join(left, right, by = c('country', 'ID'))
+train = inter[1:as.integer(0.9 * nrow(inter)),]
+test = inter[-(1:as.integer(0.9 * nrow(inter))),]
+model = lm(data = train, mag.x ~ mag.y)
+summary(model)
+summary(stats::predict(model, test) - test$mag.x)
+```
+
+##Q8
+
+According to correlation coefficient and scatter plot, there is not any relation between depth and magnitude of earthquak
+```{r}
+cor.test(worldEQ$depth,worldEQ$mag)
+```
+
+##Q9
+
+```{r}
+worldEQ = read.csv('~/Downloads/week_11/data/worldwide.csv')
+worldEQ$country = sub(".*, ", "", worldEQ$place)
+worldEQ$time = as.Date(worldEQ$time)
+worldEQ$year = year(worldEQ$time)
+worldEQ = worldEQ %>% group_by(place, year) %>% summarise(number = n()) %>% ungroup() %>% group_by(place) %>% summarise(n = mean(number))
+worldEQ %>% arrange(desc(n)) %>% top_n(20) -> top20
+ggplot(top20) + geom_bar(aes(x = place, y = n), stat = "identity") 
+```
+
+
+
+##Q10
+```{r}
+bigEQ %>% arrange(desc(EQ_PRIMARY)) %>% top_n(10) ->f
+ggplot(f) + geom_bar(aes(x = COUNTRY, y = EQ_PRIMARY),stat = "identity")
+
+bigEQ %>% filter(EQ_PRIMARY > 7) %>% group_by(COUNTRY) %>% summarise(n = n()) %>% top_n(10) -> d 
+ggplot(d) + geom_bar(aes(x = COUNTRY, y = n),stat = "identity")
+ 
+ts = sunami %>% filter(EQ_PRIMARY > 8)
+
+ggplot() + geom_polygon(data = worldMap, aes(x = long, y = lat, group = group),fill = 'blue') + geom_point(data = ts, aes(x = LONGITUDE, y = LATITUDE), color = 'orange', size = 0.3)
+
+
+```

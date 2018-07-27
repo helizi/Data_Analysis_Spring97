@@ -1,0 +1,101 @@
+---
+title: "HW5_94104778"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(coin)
+```
+
+##Q1
+<p>
+I have used the Kolmogorov-Smirnov and Chi-Square test to test that whether the numbers follow uniform distribution or not. if yes, it means that we can say sales of the all branches equal. According to p-values numbers follow uniform distribution so the branches have same sales.
+</p>
+
+```{r}
+df <- c(102, 300, 102, 100, 205, 105, 71 , 92)
+ks.test(df,"punif",71,300)
+chisq.test(df, p = rep(1/8,8))
+```
+
+## Q2
+<p>
+We will use permutation test to check whether two groups of modern and classical have the same sales or not. According to p-value we cant conclude there is significant difference between these groups.
+</p>
+
+```{r}
+sales = data.frame(sale = c(50, 50, 60, 70, 75, 80, 90, 85,55, 75, 80, 90, 105, 65),
+                    store = factor(c(rep("classical",8), rep("Modern",6))))
+coin::oneway_test(sale~store, data=sales, distribution="exact")
+
+```
+
+## Q3
+<p>
+We will use permutation test to check whether advertising would affect the sales or not. According to p-value we cant conclude that advertising has effect on sales.
+</p>
+
+```{r}
+advertisments = data.frame(sales = c(509, 517, 502, 629, 830, 911, 847, 803, 727, 853, 757, 730, 774, 718, 904,517, 508, 523, 730, 821, 940, 818, 821, 842, 842, 709, 688, 787, 780, 901),
+                    ads = factor(c(rep("nonads",15), rep("ads",15))))
+coin::oneway_test(sales~ads, data=advertisments, distribution="exact")
+
+```
+
+## Q4
+
+<p>
+Since we have three samples from three groups based on their colors, I have used Kruskal test which tells us whether there is a significant difference between these groups or not. According to p-value we cant conclude that there is significant difference.
+</p>
+```{r}
+salesbycolor = data.frame(sales = c(510, 720, 930, 754, 105, 925, 735, 753, 685, 730, 745, 875, 610),
+                    ads = factor(c(rep("white",5), rep("blue",4), rep("red",4))))
+kruskal.test(sales ~ ads, data = salesbycolor)
+
+```
+## Q5
+<p>
+I have used Friedman test which tell us whether advertising has any effect on customer satisfaction or not. According to p-value we cant conclude that it has.
+</p>
+
+```{r}
+tv = read.csv("~/Downloads/hw_05/data/tv.csv")
+friedman.test(as.matrix(tv))
+
+```
+
+## Q6
+
+<p>
+I have used Chi-Square test to tell whether there is a relation between two categorical variables population and service usage. According to p-value we can conclude that there is a relation between these variables.
+</p>
+```{r}
+popu <- data.frame(always = c(151,802,753))
+popu<-cbind(popu,sometime =  c(252,603,55))
+popu<-cbind(popu,never = c(603,405,408))
+chisq.test(popu)
+```
+
+##Q7
+
+<p>
+I have used Spearman's Correlation test which tell us whether there is relation between sales of product A and product B which could be described by a monotonic function. According to p-value and rho, we cant conclude that sales of products do have a relation with each other.
+</p>
+
+
+```{r}
+consum = read.csv("~/Downloads/hw_05/data/consumption.csv")
+cor.test(consum$A, consum$B,method = "spearman")
+```
+
+##Q8
+
+I have used Chi-Square test to tell whether there is a relation between two categorical variables sex and purchasing factors. According to p-value we can conclude that there is a relation between these variables.
+```{r}
+charbuy <- data.frame(male = c(301,353,558))
+charbuy<-cbind(female=  c(502,155,153))
+chisq.test(charbuy)
+```
+

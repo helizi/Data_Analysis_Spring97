@@ -1,0 +1,142 @@
+---
+title: "Untitled"
+output: html_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,comment = "",error = F,message = F,
+                      warning = F,fig.width = 10,fig.height = 6,fig.align = "center")
+library(readr)
+library(dplyr)
+library(ggplot2)
+```
+
+## Q1
+Samsung has produced the most number of mobiles.
+
+```{r}
+mobile <- read_csv("~/Desktop/mobile_data.csv")
+topone <- tail(names(sort(table(mobile$company))), 1)
+topone
+toptwenty <- head(sort(table(mobile$company), decreasing = TRUE), 20)
+p = ggplot(data = data.frame(toptwenty), aes(x = Var1,y = Freq))
+p + geom_bar(stat = "identity", width = 0.5, fill = "aquamarine") + xlab("Company")+ ylab("Number")+ ggtitle("Number of cellphones produced by each company") + theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5,size = 15)) 
+```
+
+##Q2
+
+```{r}
+mobile <- read_csv("~/Desktop/mobile_data.csv")
+mob_br <- mobile %>% group_by(year) %>% summarise(breadth = mean(dim_breadth, na.rm = T))
+breadth = ggplot(mob_br) + geom_line(aes(x = year, y = breadth)) + geom_smooth(aes(x = year, y= breadth), method = "lm") + ggtitle("breadth vs year")
+breadth
+mob_th <- mobile %>% group_by(year) %>% summarise(thickness = mean(dim_thickness, na.rm = T))
+thick = ggplot(mob_th) + geom_line(aes(x = year, y = thickness))  + geom_smooth(aes(x = year, y= thickness), method = "lm") + ggtitle("thickness vs year")
+thick
+mob_ln <- mobile %>% group_by(year) %>% summarise(len = mean(dim_length, na.rm = T))
+length = ggplot(mob_ln) + geom_line(aes(x = year, y = len))  + geom_smooth(aes(x = year, y= len), method = "lm") + ggtitle("length vs year")
+length
+mob_cam <- mobile %>% group_by(year) %>% summarise(pixel = mean(cam_px, na.rm = T))
+camera = ggplot(mob_cam) + geom_line(aes(x = year, y = pixel))  + geom_smooth(aes(x = year, y= pixel), method = "lm") + ggtitle("pixel vs year")
+camera
+
+```
+
+##Q3
+```{r}
+mobile <- read_csv("~/Desktop/mobile_data.csv")
+mob_simnumber <- mobile  %>% group_by(sim_no,LTE) %>% summarise(price = mean(price, na.rm = T))
+simcard <- ggplot(mob_simnumber)+ geom_bar(aes(x = sim_no, y = price, fill = LTE),position = "dodge", stat = "identity") + xlab("simcard number and LTE") +ggtitle("price according to LTE and number of simcards")
+simcard
+```
+
+##Q4
+
+```{r}
+mobile <- read_csv("~/Desktop/mobile_data.csv")
+mobile2017 <- filter(mobile, year == 2017)
+jackprthick <- ggplot(mobile2017) + geom_boxplot(aes(x = audio_jack, y = dim_thickness), fill = "coral3") + ylab("thickness") + ggtitle("thickness according to audio jack")
+jackprthick
+```
+
+##Q5
+
+```{r}
+mobile <- read_csv("~/Desktop/mobile_data.csv")
+ppimobile <- mobile %>% mutate(ppi = sqrt(px_row^2  + px_col^2) / display_size)
+ppigraph <- ggplot(ppimobile) + geom_histogram(aes(x = ppi), fill = "darkred") +ggtitle("Number of cellphones with specific PPI")
+ppigraph
+ppiyear <- ppimobile %>% group_by(year) %>% summarise(ppiperyear = mean(ppi, na.rm = T) )
+ppiperyeargraph <- ggplot(ppiyear) + geom_bar(aes(x = year, y = ppiperyear),stat = "identity", fill = "deeppink4") +
+  xlab("Year") + ylab("mean ppi") + ggtitle("mean ppi per year")
+ppiperyeargraph
+themostppi <- ppimobile %>% arrange(desc(ppi)) %>% head(1)
+themostppi$device
+```
+##Q6
+```{r}
+mobile <- read_csv("~/Desktop/mobile_data.csv")
+gooshtkoobmobile <- filter(mobile, dim_thickness > 25)
+sorted <- gooshtkoobmobile %>% arrange(desc(dim_thickness)) %>% head(10) %>% mutate(name = device)
+gooshtkoobgraph <- ggplot(sorted) + geom_bar(aes(x = name, y = dim_thickness), stat = "identity", fill = "deeppink4") + xlab("device")+ ylab("Thickness") + ggtitle("Thickness of best Gooshtkoobs")
+gooshtkoobgraph
+
+
+```
+
+##Q7
+```{r}
+mobile <- read_csv("~/Desktop/mobile_data.csv")
+mobiledensity <- mobile %>% mutate(density = weight * 1000 / (dim_thickness * dim_breadth * dim_length))
+nrow(filter(mobiledensity, density < 1))
+mobiledensitygraph <- ggplot(mobiledensity) + geom_point(aes(x = 1:nrow(mobile) ,y = density, color = density > 1), na.rm = T, size = 3) + scale_colour_manual(name = 'density> 1', values = setNames(c('red','green'),c(T, F))) +
+  xlab('data') + ylab('density') +ggtitle("scattering of density of cellphones")
+mobiledensitygraph
+
+```
+
+##Q8
+
+```{r}
+mobile <- read_csv("~/Desktop/mobile_data.csv")
+batteryvsweight <- ggplot(mobile) + geom_point(aes(x = battery_mah, y = weight), na.rm = T,color = "deeppink4") + ggtitle("Weight according to Battery Capacity")
+batteryvsweight
+cor(mobile$battery_mah, mobile$weight, use = "complete.obs")
+```
+
+##Q9
+
+```{r}
+mobile <- read_csv("~/Desktop/mobile_data.csv")
+samsungmobile <- filter(mobile, company == "Samsung")
+parchamperyear <- samsungmobile %>% group_by(year) %>% slice(which.max(price)) %>% mutate(device)
+pricetimegraph <- ggplot(parchamperyear) + geom_point(aes(x = year, y = price, label = device), size = 5, color = "deeppink4") + ggtitle("Price of the most expensive samsung cellphone in each year") + geom_text(aes(x = year, y = price, label=device),hjust=0, vjust=0)
+pricetimegraph
+
+```
+
+##Q10
+<p dir = "rtl">
+نمودار اول نمودار متوسط قیمت گوشی در هر سال است که میبینیم در ابتدای قرن ۲۰ام بسیار زیاد بوده است سپس کاهش چشمگیر داشته و دوباره افزایش داشته است. این نمودار از این منظر جالب است که علت کاهش اولیه احتمالا پیدایش تکنولوژی های اولیه و پیشرفت انسان در زمینهی ترانزیستورها و غیره بوده است اما افزایش دوباره احتمالا به علت پیدایش تکنولوژی های جدید مانند سیستم عامل صفحه نمایش لمسی و غیره ایجاد شده است.
+نمودار دوم ۱۰ کمپانی با گران قیمت ترین گوشی های همراه را نشان میدهد که نکته جالب در ان این است که بسیاری از شرکت ها در زمینهی تلفن همراه خیلی شناخته شده نیستند.
+نمودار سوم رشد کیفیت دوربین های سلفی و دوربین گوشی را نشان میدهد که میبینیم دوربین سلفی در سال های اخیر با شیب بیشتری رشد داشته است و به طور کلی به نظر میرسد همهی شرکتها تمرکز زیادی روی بالا بردن کیفیت دوربینهای خود گذاشتهاند.
+</p>
+
+```{r}
+mobile <- read_csv("~/Desktop/mobile_data.csv")
+meanpriceperyear <- mobile %>% group_by(year) %>% summarise(priceperyear = mean(price,na.rm = T))
+meanpriceperyeargraph <- ggplot(meanpriceperyear) + geom_line(aes(x = year, y = priceperyear),size = 5) + xlab("year") + ylab("mean price") + ggtitle("Mean price per year")
+meanpriceperyeargraph
+
+meanpricepercomany <- mobile %>% group_by(company) %>% summarise(pricepercompany = mean(price,na.rm = T)) %>% arrange(desc(pricepercompany)) %>% head(10) 
+meanpricepercomgraph <- ggplot(meanpricepercomany) + geom_point(aes(x = company, y = pricepercompany),size = 5) + xlab("company") + ylab("mean price") + ggtitle("Mean price per company")
+meanpricepercomgraph
+
+campx <- mobile %>% group_by(year) %>% summarise(meancampx = mean(cam_px, na.rm = T))
+selpx <- mobile %>% group_by(year) %>% summarise(meanselpx = mean(sel_px, na.rm = T))
+ggplot() + 
+geom_line(data=campx, aes(x=year, y=meancampx,label = "camera pixel"), color='green') + 
+geom_line(data=selpx, aes(x=year, y=meanselpx), color='red', label= "selfie pixel")
+
+
+```
+

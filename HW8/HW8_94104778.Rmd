@@ -1,0 +1,179 @@
+---
+title: "Untitled"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+library(gutenbergr)
+library(tm)
+library(tidytext)
+library(dplyr)
+library(corpus)
+library(ggplot2)
+library(highcharter)
+library(wordcloud2)
+library(spacyr)
+library(stringr)
+library(tidyr)
+options(warn=-1)
+```
+
+```{r}
+books <-gutenberg_download(c(580,730,967,700,917,968,821,766,1023,786,963,1400,883,564))  
+```
+
+## Q1
+
+
+```{r}
+stop_words <- rbind(stop_words, c("miss", "SMART"))
+stop_words <- rbind(stop_words, c("sir", "SMART"))
+words <- books %>% unnest_tokens(word, text)
+word_counts <- words %>% anti_join(stop_words, by = "word") %>% count(word, sort = TRUE) %>% top_n(20)
+hchart(word_counts, "column", hcaes(x = word, y = n))
+```
+
+## Q2
+
+```{r echo=TRUE}
+first200 <- words %>% anti_join(stop_words, by = "word") %>% count(word, sort = TRUE) %>% top_n(200)
+wordcloud2(first200, size=0.2, figPath = "~/Desktop/fig1.png")
+
+```
+
+
+## Q3
+
+```{r message=FALSE, warning=FALSE}
+
+numbers <- c(580,730,967,700,917,968,821,766,1023,786,963,1400,883,564)
+for (i in numbers){
+str_replace_all(gutenberg_download(i), "[[:punct:]]","") -> clean
+str_replace_all(clean, "\n","") -> clean
+str_replace_all(clean, "\"","") -> clean
+str_replace_all(clean, "xa0xa0","") -> clean
+firstcap <- str_extract_all(clean, "\\b[A-Z]\\w+")[[2]]
+firstnotcap <- str_extract_all(clean, "\\b[a-z]\\w+")[[2]]
+allcap <- str_extract_all(clean, '\\b[A-Z]+\\b')[[2]]
+firstcap <- sapply(firstcap,tolower)
+allcap <- sapply(allcap,tolower)
+allcap <- data.frame(allcap)
+colnames(allcap) <- "word"
+firstcap <- data.frame(firstcap)
+firstnotcap <- data.frame(firstnotcap)
+colnames(firstcap) <- "word"
+colnames(firstnotcap) <- "word"
+
+filtered <- firstcap %>% anti_join(firstnotcap, by = "word")  %>% anti_join(stop_words, by = "word")
+filtered <- filtered %>% group_by(word) %>% summarise(n = n()) %>% arrange(desc(n)) %>% top_n(5)
+
+print(ggplot(filtered, aes(x = word, y = n)) + geom_bar(stat = "identity") + ggtitle(gutenberg_metadata %>% filter(gutenberg_id == i ) %>% select(title)))
+ 
+}
+```
+
+## Q4
+
+```{r}
+positive <- get_sentiments("nrc") %>% filter(sentiment == "positive" | sentiment == "negative")
+
+np = books  %>% group_by(gutenberg_id) %>% unnest_tokens(word, text) %>% anti_join(stop_words, by = "word") %>% inner_join(positive) %>% count(word, sort = T) %>% top_n(40) %>% do(p = ggplot(data=.) + geom_bar(aes(x=reorder(word, -n),y=n),stat="identity") + ggtitle(unique(gutenberg_metadata %>%  filter(gutenberg_id == .$gutenberg_id) %>%select(author))) + theme(axis.text.x = element_text(angle = 90, hjust = 1)))
+
+np$p
+
+```
+
+## Q5
+
+```{r message=FALSE, warning=FALSE}
+les_miserablebook <- gutenberg_download(135)
+les_miserable <- split(les_miserablebook, rep(1:200, nrow(les_miserablebook)/200))
+positive <- get_sentiments("nrc") %>% filter(sentiment == "positive")
+negative <- get_sentiments("nrc") %>% filter(sentiment == "negative")
+positives <- data.frame()
+negatives <- data.frame()
+
+for(i in 1:200){
+  positives <- rbind(positives, nrow(les_miserable[[i]] %>% unnest_tokens(word, text) %>% anti_join(stop_words, by = "word") %>% inner_join(positive, by = "word")))
+    negatives <- rbind(negatives, nrow(les_miserable[[i]] %>% unnest_tokens(word, text) %>% anti_join(stop_words, by = "word") %>% inner_join(negative, by = "word")))
+}
+hchart(positives, "column", hcaes(x = c(1:200), y = positives$X115L))
+hchart(negatives, "column", hcaes(x = c(1:200), y = negatives$X104L))
+
+```
+
+## Q6
+
+```{r}
+
+bigrams = books %>% unnest_tokens(bigram, text, token = "ngrams", n = 2) %>%
+  separate(bigram, c("firstToken", "secondToken"), sep = " ") %>% filter(!firstToken %in% stop_words$word) %>% filter(!secondToken %in% stop_words$word)
+bigramcnt <- bigrams %>% count(firstToken, secondToken, sort = TRUE) %>% top_n(30)
+hchart(bigramcnt, "column", hcaes(x = paste(firstToken, secondToken, sep=" "), y = n))
+```
+
+
+## Q7
+
+```{r}
+bigramcntt <- books %>% unnest_tokens(bigram, text, token = "ngrams", n = 2) %>%
+  separate(bigram, c("firstToken", "secondToken"), sep = " ") %>% filter((firstToken == "he" & !secondToken %in% stop_words$word) | (firstToken == "she" & !secondToken %in% stop_words$word))  %>% 
+count(firstToken, secondToken, sort = TRUE) %>% top_n(30)
+
+hchart(bigramcntt, "column", hcaes(x = paste(firstToken, secondToken, sep=" "), y = n))
+```
+
+
+## Q8
+
+```{r}
+wordspergroup = words %>% group_by(gutenberg_id) %>% anti_join(stop_words, by = 'word') %>% count(word, sort = TRUE)
+bigramspergroup =  books %>% unnest_tokens(bigram, text, token = "ngrams", n = 2) %>% group_by(gutenberg_id) %>%  separate(bigram, c("firstToken", "secondToken"), sep = " ") %>% filter(!firstToken %in% stop_words$word) %>% filter(!secondToken %in% stop_words$word)  %>% count(firstToken, secondToken, sort = TRUE) %>% mutate(bigram = paste(firstToken, secondToken, sep=' ')) %>% select(gutenberg_id, n, bigram)
+
+colnames(wordspergroup) = c("gutenberg_id", "token", "occurrence")
+colnames(bigramspergroup) = c("gutenberg_id", "occurrence", "token")
+wordspergroup$index = seq(1:nrow(wordspergroup))
+bigramspergroup$index = seq(1:nrow(bigramspergroup))
+
+for(i in numbers){
+  unigram <- wordspergroup %>% filter(gutenberg_id == i)
+  bigram <- bigramspergroup %>% filter(gutenberg_id == i)
+  
+  u = glm(data <- unigram, formula = log(occurrence) ~ log(index), family="gaussian")
+  b = glm(data <- bigram, formula = log(occurrence) ~ log(index), family="gaussian")
+
+  fit<-cbind(coef(u), coef(b))
+  print(fit)
+
+  print(qplot(log(unigram$index), log(unigram$occurrence)) + geom_abline(slope = fit[2, 1], intercept = fit[1, 1]) + labs(x = "Log(n-gram index)", y = "Log(Number of occurrence)", title = paste(ggtitle(gutenberg_metadata %>% filter(gutenberg_id == i ) %>% select(title)))))
+
+  print(qplot(log(bigram$index), log(bigram$occurrence)) + geom_abline(slope = fit[2, 1], intercept = fit[1, 1]) + labs(x = "Log(n-gram index)", y = "Log(Number of occurrence)", title = paste(ggtitle(gutenberg_metadata %>% filter(gutenberg_id == i ) %>% select(title)))))
+}
+```
+
+## Q9
+
+```{r}
+wordspergroup <- les_miserablebook %>% unnest_tokens(word, text) %>% anti_join(stop_words, by = 'word') %>% count(word, sort = TRUE)
+bigramspergroup <-  les_miserablebook %>% unnest_tokens(bigram, text, token = "ngrams", n = 2) %>% separate(bigram, c("firstToken", "secondToken"), sep = " ") %>% filter(!firstToken %in% stop_words$word) %>% filter(!secondToken %in% stop_words$word)  %>% count(firstToken, secondToken, sort = TRUE) %>% mutate(bigram = paste(firstToken, secondToken, sep=' ')) %>% select("bigram","n")
+
+colnames(wordspergroup) = c("token", "occurrence")
+colnames(bigramspergroup) = c("token", "occurrence")
+wordspergroup$index = seq(1:nrow(wordspergroup))
+bigramspergroup$index = seq(1:nrow(bigramspergroup))
+
+
+u = glm(data <- wordspergroup, formula = log(occurrence) ~ log(index), family="gaussian")
+b = glm(data <- bigramspergroup, formula = log(occurrence) ~ log(index), family="gaussian")
+
+fit<-cbind(coef(u), coef(b))
+print(fit)
+
+print(qplot(log(wordspergroup$index), log(wordspergroup$occurrence)) + geom_abline(slope = fit[2, 1], intercept = fit[1, 1]) + labs(x = "Log(n-gram index)", y = "Log(Number of occurrence)", title = paste(i, "Double logarithmic plot of the wordss occurrence distribution", sep = ' ')))
+
+  print(qplot(log(bigramspergroup$index), log(bigramspergroup$occurrence)) + geom_abline(slope = fit[2, 1], intercept = fit[1, 1]) + labs(x = "Log(n-gram index)", y = "Log(Number of occurrence)", title = paste(i, "Double logarithmic plot of the bigrams occurrence distribution", sep = ' ')))
+
+```
+

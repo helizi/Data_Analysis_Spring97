@@ -1,0 +1,363 @@
+---
+title: "HW10_94104778"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(WDI)
+library(dplyr)
+library(highcharter)
+library(ggplot2)
+library(data.table)
+library(reshape2)
+library(factoextra)
+```
+
+
+
+<p dir = "rtl">
+در سوالات ۵ و ۹ نمودارها knit نشدند. لطفا برای دیدن آنها کد را ران کنید.
+</p>
+
+```{r}
+wdiData <- read.csv("~/Downloads/WDI_csv/WDIData.csv")
+wdiCountry <- read.csv("~/Downloads/WDI_csv/WDICountry.csv")
+wdiSeries <- read.csv("~/Downloads/WDI_csv/WDISeries.csv")
+
+```
+
+##Q1
+<p dir = "rtl">
+در این سوال ملاک فقر را درصد جمعیت زیر خط فقر گرفتم و بر اساس بیشترین جمعیتها فقیرترین کشورها را حساب کردم. سپس شاخص امید به زندگی این کشورها را در تمام سالهای موجود در داده میانگین گرفتم. همچنین برای حقوق روزانه شاخص حقوق سالیانه را بر تعداد روزهای سال تقسیم کردم که در نمودار اطلاعات آن امدهاست.
+</p>
+
+```{r message=FALSE}
+poverty <- wdiData %>% filter(Indicator.Code == "SI.POV.NAHC") %>% select(Country.Name, starts_with("X")) 
+poverty$PercentageOfPeopleBeyondPovertyLine <- poverty %>% select(starts_with("X")) %>% rowMeans(na.rm = T) 
+tenpoorest <- poverty %>% arrange(desc(PercentageOfPeopleBeyondPovertyLine)) %>% select(Country.Name,PercentageOfPeopleBeyondPovertyLine)%>% top_n(10)
+
+poorcountrieslifetime <- wdiData %>% filter(Indicator.Code == "SP.DYN.LE00.IN" & Country.Name %in% tenpoorest$Country.Name) %>% select(Country.Name, starts_with("X")) 
+poorcountrieslifetime$meanOfLifeTime <- poorcountrieslifetime %>% select(starts_with("X")) %>% rowMeans(na.rm = T)
+poorcountrieslifetime <- poorcountrieslifetime %>% select(Country.Name,meanOfLifeTime)
+
+poors <- inner_join(tenpoorest,poorcountrieslifetime, by = "Country.Name")
+poors
+
+wdiData %>% filter(Country.Name %in% poors$Country.Name & Indicator.Code == "NY.GNP.PCAP.PP.CD") ->annualsalary
+annualsalary$dailysalary <- annualsalary %>% select(starts_with("X")) %>% rowMeans(na.rm = T) 
+annualsalary$dailysalary <- annualsalary$dailysalary / 365
+hchart(annualsalary, "column", hcaes(x = Country.Name, y = dailysalary))
+```
+
+##Q2
+
+<p dir = "rtl">
+همان طور که از نمودار مشخص است در سال ۱۹۹۴ امید به زندگی در کشور روآندا به ۲۷ سال میرسد که مصادف با نسل کشی در این کشور است و حدود ۱ میلیون نفر کشته شدهاند. 
+</p>
+
+```{r message=FALSE}
+lifeexp <- wdiData %>% filter(Indicator.Code == "SP.DYN.LE00.IN") %>% select(Country.Name, starts_with("X")) 
+lifeexp <- lifeexp[48:264,] %>% melt
+rwanda <- wdiData %>% filter(Country.Code == "RWA" & Indicator.Code == "SP.DYN.LE00.IN") %>% select(starts_with("X")) %>% t() %>% data.frame() %>% setDT(keep.rownames = T)
+colnames(rwanda) <- c("year","life")
+rwanda <- rwanda[1:57,]
+hcboxplot(x = lifeexp$value, var = lifeexp$variable,
+          name = "Length", color = "#2980b9")  %>% 
+  hc_chart(type = "column") %>% 
+hc_add_series(rwanda, "line", hcaes(x= year, y = life))
+
+
+
+```
+
+##Q3
+
+<p dir = "rtl">
+نمیتوان نتیجه گیری مطمئنی کرد چون پراکندگی دادهها در ابتدای نمودار زیاد است اما طبق خطی که بر دادهها برازش شدهاست به نظر میرسد میان شاخص هزینههای سلامت و امید به زندگی رابطهی مستقیمی وجود دارد.
+</p>
+
+
+
+
+```{r warning=FALSE}
+search<-WDIsearch(string = "health", field = "name", short = TRUE, cache = NULL)
+healthexpendituretotaldollor <- wdiData %>% filter(Indicator.Code == "SH.XPD.CHEX.GD.ZS") %>% select(Country.Name, starts_with("X")) 
+healthexpendituretotaldollor$mean <- healthexpendituretotaldollor %>% select(starts_with("X")) %>% rowMeans(na.rm = T)
+
+lifeexpectancy <- wdiData %>% filter(Indicator.Code == "SP.DYN.LE00.IN") %>% select(Country.Name, starts_with("X")) 
+lifeexpectancy$mean <- lifeexpectancy %>% select(starts_with("X")) %>% rowMeans(na.rm = T)
+
+lifeandhealth <- inner_join(lifeexpectancy %>% select(Country.Name,mean), healthexpendituretotaldollor %>% select(Country.Name, mean), by = "Country.Name")
+colnames(lifeandhealth) <- c("CountryName","LifeExpectancy", "HealthExpenditure")
+
+ggplot(lifeandhealth, aes(x=HealthExpenditure, y=LifeExpectancy)) +
+    geom_point(shape=1) +   
+    geom_smooth(method=lm,   
+                se=FALSE) 
+
+```
+
+##Q4
+
+<p dir = "rtl">
+برای این کار از شاخص CPI
+استفاده شده است. به این معنی که بالاتر رفتن CPI
+به معنای کم ارزش تر شدن همان مقدار پول است.
+در نتیجه در طی این سال ها قدرت خرید مردم ایران همواره کاهش یافته است
+</p>
+
+```{r}
+householdexpeditureUsdollor <- wdiData %>% filter(Country.Code == "IRN" & Indicator.Code == "FP.CPI.TOTL")
+householdexpeditureUsdollor <- householdexpeditureUsdollor[,5:63]
+householdexpeditureUsdollor <- t(householdexpeditureUsdollor)
+householdexpeditureUsdollor <- data.frame(householdexpeditureUsdollor)
+
+householdexpeditureUsdollor <- setDT(householdexpeditureUsdollor, keep.rownames = TRUE)
+colnames(householdexpeditureUsdollor) <- c("Year", "Household")
+hchart(householdexpeditureUsdollor, "line", hcaes(x = Year, y = Household))
+```
+
+
+
+##Q5
+
+```{r message=FALSE}
+importantFinancialIndicator <- c("FR.INR.LNDP","BN.CAB.XOKA.CD","BX.GSR.GNFS.CD","NE.CON.GOVT.CD", "NE.CON.PETC.CD", "NE.EXP.GNFS.KD.ZG", "FP.CPI.TOTL.ZG","FR.INR.DPST","FR.INR.LEND","SL.GDP.PCAP.EM.KD", "BM.GSR.GNFS.CD" , "NY.GDP.MKTP.KD.ZG","FI.RES.TOTL.CD","FI.RES.TOTL.DT.ZS","FM.LBL.BMNY.CN","FS.AST.CGOV.GD.ZS", "NY.GDP.MKTP.KD", "NY.ADJ.NNAT.CD", "NY.GDP.MKTP.PP.CD","NY.GDP.FCST.CD")
+
+codesandNames <- wdiSeries %>% filter(Series.Code %in% importantFinancialIndicator) %>% select(Series.Code, Indicator.Name)
+for (i in 1:20){
+ indicator <- wdiData %>% filter(Indicator.Code == importantFinancialIndicator[i]) %>% select(Country.Name, starts_with("X")) 
+indicator <- indicator[48:264,] %>% melt
+iran <- wdiData %>% filter(Country.Code == "IRN" & Indicator.Code == importantFinancialIndicator[i]) %>% select(starts_with("X")) %>% t() %>% data.frame() %>% setDT(keep.rownames = T)
+colnames(iran) <- c("year","indicator")
+iran <- iran[1:57,]
+print(hcboxplot(x = indicator$value, var = indicator$variable,
+          name = "Length", color = "#2980b9",outliers = F)  %>% 
+  hc_chart(type = "column") %>% 
+hc_add_series(name = "Iran" , iran, type = "line", hcaes(x= year, y = indicator),color = "Red") %>% 
+  hc_yAxis(title =list(text =codesandNames$Indicator.Name[i])))
+print(hchart(indicator, "line", hcaes(x = variable, y = value, group = Country.Name)))
+
+}
+
+
+```
+
+##Q6
+
+<p dir = "rtl">
+ایران در دستهی سوم همراه با کشورهای چین، قطر و ... قرار دارد.
+</p>
+
+```{r message=FALSE, warning=FALSE}
+allfinancialIndicators <- wdiData %>% filter(Indicator.Code %in% importantFinancialIndicator) %>% select(Country.Name,Indicator.Name, starts_with("X"))
+allfinancialIndicators <- allfinancialIndicators[941:5280,] %>% melt 
+allfinancialIndicators <- allfinancialIndicators %>% select(Country.Name, Indicator.Name, variable, value)
+colnames(allfinancialIndicators) <- c("Country", "Indicator" ,"Year","Value")
+allfinancialIndicators <- reshape(allfinancialIndicators,idvar = c("Country","Year"), timevar = "Indicator", direction = "wide") 
+allfinancialIndicatorsPerCnt <- allfinancialIndicators %>% group_by(Country) %>% summarise_all(funs(mean(., na.rm = TRUE)))
+for(i in 3:22){
+  allfinancialIndicatorsPerCnt[is.na(allfinancialIndicatorsPerCnt[,i]), i] <- colMeans(allfinancialIndicatorsPerCnt[,3:22],na.rm = TRUE)[i-2]
+}
+scaled <- scale(allfinancialIndicatorsPerCnt[,3:22])
+rownames(scaled) <- allfinancialIndicatorsPerCnt$Country
+kcl = kmeans(scaled,centers = 3) 
+kcl$cluster[91]
+fviz_cluster(kcl, data = scaled)
+```
+
+
+##Q7
+
+<p dir = "rtl">
+
+بله چرا که خوشهها در راستای دو مولفهی اصلی تشکیل شدهاند.
+</p>
+```{r}
+library(factoextra)
+
+pca <- prcomp(scaled)
+fviz_pca_biplot(pca, habillage=as.factor(kcl$cluster))
+```
+
+##Q8
+
+<p dir = "rtl">
+همانند روشی که در تمارین قبلی استفاده کردیم برای پیشبینی رشد اقتصادی ایران از مقدار رشد در سالهای قبل استفاده میکنیم. تعداد سالهای قبل را عددی بین ۱ و ۱۰ در نظر میگیریم و سپس با برازش خط و مقایسهی خطاها به نظر میرسد بهترین تعداد سال ۲ است. یعنی در صورتی که مقدار رشد در هر سال را با استفاده از دادهی دو سال قبل به دست آوریم بهترین نتیجه را خواهیم گرفت.
+
+</p>
+
+```{r message=FALSE, warning=FALSE}
+gdpgrowth <- wdiData %>% filter(Country.Code == "IRN", Indicator.Code == "NY.GDP.MKTP.KD.ZG") %>% select(starts_with("X")) 
+gdpgrowth <- data.frame(t(gdpgrowth))
+colnames(gdpgrowth) <- c("GDPgrowth")
+gdpgrowth[is.na(gdpgrowth)] <- mean(gdpgrowth$GDPgrowth, na.rm = T)
+gdpgrowth$n <- seq.int(nrow(gdpgrowth))
+for (k in (1:10)){
+  df <- data.frame()
+  if (k != 1){
+    
+    for (i in 1:(nrow(gdpgrowth)-k)){
+      df <- rbind(df, gdpgrowth$GDPgrowth[i:(i+k)])
+      
+    }
+    print(k)
+    print(mean(summary(lm(df[,ncol(df)]~., data = df))$residuals^2))
+  }
+  if(k == 1){
+    df <- gdpgrowth$GDPgrowth[1:nrow(gdpgrowth)-1]
+    df <- cbind(df, gdpgrowth$GDPgrowth[2:nrow(gdpgrowth)])
+    df <- data.frame(df)
+    print(mean(summary(lm(V2~., data = df))$residuals^2))
+  }
+}
+df <- data.frame()
+for (i in 1:(nrow(gdpgrowth)-2)){
+      df <- rbind(df, gdpgrowth$GDPgrowth[i:(i+2)])
+      
+}
+
+
+```
+
+##Q9
+###Educational
+
+```{r message=FALSE, warning=FALSE}
+importantEducationalIndicator <- c("SE.ADT.1524.LT.FE.ZS","SE.ADT.LITR.ZS","SE.ADT.1524.LT.MA.ZS","SE.COM.DURS", "SE.PRE.ENRL.TC.ZS", "SE.PRE.ENRR", "SE.PRM.AGES","SE.PRM.CMPT.ZS","SE.PRM.OENR.ZS", "SE.PRM.PRSL.ZS" , "SE.PRM.REPT.ZS","SE.PRM.TCAQ.ZS","SE.PRM.UNER","SE.PRM.UNER.FE.ZS","SE.PRM.UNER.MA.ZS", "SE.SEC.PROG.ZS", "SE.SEC.UNER.LO.ZS","SE.XPD.TOTL.GB.ZS","SE.XPD.TOTL.GD.ZS", "SE.XPD.PRIM.ZS")
+codesandNamesedu <- wdiSeries %>% filter(Series.Code %in% importantEducationalIndicator) %>% select(Series.Code, Indicator.Name)
+for (i in 1:20){
+ indicator <- wdiData %>% filter(Indicator.Code == importantEducationalIndicator[i]) %>% select(Country.Name, starts_with("X")) 
+indicator <- indicator[48:264,] %>% melt
+iran <- wdiData %>% filter(Country.Code == "IRN" & Indicator.Code == importantEducationalIndicator[i]) %>% select(starts_with("X")) %>% t() %>% data.frame() %>% setDT(keep.rownames = T)
+colnames(iran) <- c("year","indicator")
+iran <- iran[1:57,]
+print(hcboxplot(x = indicator$value, var = indicator$variable,
+          name = "Length", color = "#2980b9",outliers = F)  %>% 
+  hc_chart(type = "column") %>% 
+hc_add_series(name = "Iran" , iran, type = "line", hcaes(x= year, y = indicator),color = "Red") %>% 
+  hc_yAxis(title =list(text =codesandNamesedu$Indicator.Name[i])))
+#print(hchart(indicator, "line", hcaes(x = variable, y = value, group = Country.Name)))
+
+}
+alleducationalIndicators <- wdiData %>% filter(Indicator.Code %in% importantEducationalIndicator) %>% select(Country.Name,Indicator.Name, starts_with("X"))
+alleducationalIndicators <- alleducationalIndicators[941:5280,] %>% melt 
+alleducationalIndicators <- alleducationalIndicators %>% select(Country.Name, Indicator.Name, variable, value)
+colnames(alleducationalIndicators) <- c("Country", "Indicator" ,"Year","Value")
+alleducationalIndicators <- reshape(alleducationalIndicators,idvar = c("Country","Year"), timevar = "Indicator", direction = "wide") 
+alleducationalIndicatorsPerCnt <- alleducationalIndicators %>% group_by(Country) %>% summarise_all(funs(mean(., na.rm = TRUE)))
+for(i in 3:22){
+  alleducationalIndicatorsPerCnt[is.na(alleducationalIndicatorsPerCnt[,i]), i] <- colMeans(alleducationalIndicatorsPerCnt[,3:22],na.rm = TRUE)[i-2]
+}
+scalededu <- scale(alleducationalIndicatorsPerCnt[,3:22])
+kcledu = kmeans(scalededu,centers = 3)
+fviz_cluster(kcledu, data = scaled)
+
+pcaedu <- prcomp(scalededu)
+fviz_pca_biplot(pcaedu, habillage=as.factor(kcledu$cluster))
+```
+
+##Q9
+###Health
+
+```{r message=FALSE, warning=FALSE}
+importantHealthIndicator <- c("SH.ANM.ALLW.ZS","SH.ANM.CHLD.ZS","SH.CON.1524.MA.ZS","SH.DTH.0514", "SH.DTH.INJR.ZS", "SH.DTH.MORT", "SH.DYN.0514","SH.DYN.AIDS.ZS", "SH.FPL.SATM.ZS" ,"SH.H2O.SMDW.UR.ZS","SH.H2O.SMDW.RU.ZS","SH.MMR.DTHS","SH.SGR.CRSK.ZS", "SH.MED.NUMW.P3", "SH.MED.BEDS.ZS","SH.MLR.INCD.P3","SH.PRV.SMOK.FE", "SH.PRV.SMOK.MA","SH.STA.BASS.UR.ZS","SH.STA.BRTW.ZS")
+codesandNameshealth <- wdiSeries %>% filter(Series.Code %in% importantHealthIndicator) %>% select(Series.Code, Indicator.Name)
+for (i in 1:20){
+ indicator <- wdiData %>% filter(Indicator.Code == importantHealthIndicator[i]) %>% select(Country.Name, starts_with("X")) 
+indicator <- indicator[48:264,] %>% melt
+iranhealth <- wdiData %>% filter(Country.Code == "IRN" & Indicator.Code == importantHealthIndicator[i]) %>% select(starts_with("X")) %>% t() %>% data.frame() %>% setDT(keep.rownames = T)
+colnames(iranhealth) <- c("year","indicator")
+iranhealth <- iranhealth[1:57,]
+print(hcboxplot(x = indicator$value, var = indicator$variable,
+        outliers = F)  %>% 
+  hc_chart(type = "column") %>% 
+hc_add_series(name = "Iran" , iranhealth, type = "line", hcaes(x= year, y = indicator),color = "Red") %>% 
+  hc_yAxis(title =list(text =codesandNameshealth$Indicator.Name[i])))
+#print(hchart(indicator, "line", hcaes(x = variable, y = value, group = Country.Name)))
+
+}
+allhealthIndicators <- wdiData %>% filter(Indicator.Code %in% importantHealthIndicator) %>% select(Country.Name,Indicator.Name, starts_with("X"))
+allhealthIndicators <- allhealthIndicators[941:5280,] %>% melt 
+allhealthIndicators <- allhealthIndicators %>% select(Country.Name, Indicator.Name, variable, value)
+colnames(allhealthIndicators) <- c("Country", "Indicator" ,"Year","Value")
+allhealthIndicators <- reshape(allhealthIndicators,idvar = c("Country","Year"), timevar = "Indicator", direction = "wide") 
+allhealthIndicatorsPerCnt <- allhealthIndicators %>% group_by(Country) %>% summarise_all(funs(mean(., na.rm = TRUE)))
+for(i in 3:22){
+  allhealthIndicatorsPerCnt[is.na(allhealthIndicatorsPerCnt[,i]), i] <- colMeans(allhealthIndicatorsPerCnt[,3:22],na.rm = TRUE)[i-2]
+}
+scaledhealth <- scale(allhealthIndicatorsPerCnt[,3:22])
+kclhealth = kmeans(scaledhealth,centers = 3) 
+fviz_cluster(kclhealth, data = scaled)
+
+pcahealth <- prcomp(scaledhealth)
+fviz_pca_biplot(pcahealth, habillage=as.factor(kclhealth$cluster))
+```
+
+##Q10
+
+```{r}
+allindicators <- c(importantEducationalIndicator,importantFinancialIndicator,importantHealthIndicator)
+all <- wdiData %>% filter(Indicator.Code %in% allindicators)
+all <- all[2821:15840,5:63]
+for(i in 1:59){
+  all[is.na(all[,i]), i] <- colMeans(all,na.rm = TRUE)[i]
+}
+dist = stats::dist(all,method = "euclidean")
+
+clus = hclust(dist,method = "complete")
+plot(clus)
+
+
+```
+
+##Q11
+
+###1
+
+<p dir = "rtl">
+
+کشورهایی که بیشترین جمعیت در بزرگترین شهر خود دارند.
+
+</p>
+```{r}
+wdiData %>% filter(Indicator.Code == "EN.URB.LCTY") -> largestCityPopulation
+largestCityPopulation[48:264,] %>% select(Country.Name, X2016) %>% arrange(desc(X2016)) %>% top_n(10)
+```
+
+###2
+<p dir = "rtl">
+در این سوال رابطهی میانگین قیمت گازوییل و آلودگی هوا در هفت سال اخیر در کشورهای مختلف جهان بررسی شده است. با توجه به نمودار رسم شده و همینطور تست کورلیشن به نظر میرسد رابطهی خطی میان این دو وجود دارد به این صورت که بالاتر رفتن قیمت گازوییل آلودگی هم کمتر شدهاست.
+
+</p>
+
+```{r}
+wdiData %>% filter(Indicator.Code == "EP.PMP.SGAS.CD" | Indicator.Code == "EN.ATM.PM25.MC.M3") -> gasolinePriceAndPollution
+
+gasolinePriceAndPollution <- gasolinePriceAndPollution[95:528,]
+
+GasPricemean <- rowMeans((gasolinePriceAndPollution %>% filter(Indicator.Code == "EP.PMP.SGAS.CD"))[,55:63], na.rm = T)
+
+Pollutionmean <- rowMeans((gasolinePriceAndPollution %>% filter(Indicator.Code == "EN.ATM.PM25.MC.M3"))[,55:63], na.rm = T)
+means <- cbind(Pollutionmean,GasPricemean)
+means <- cbind(means,largestCityPopulation[48:264,] %>% select(Country.Name))
+hchart(means, type = "scatter" ,hcaes(x = Pollutionmean,y = GasPricemean))
+cor.test(means$Pollutionmean,means$GasPricemean)
+
+```
+
+###3
+<p dir = "rtl">
+نمودار امید به زندگی در ایران که به طور کلی در طی این ۵۰ سال حدود ۳۰ سال زیاد شدهاست ولی در طول سالهای جنگ مقداری کاهش داشتهاست. 
+</p>
+```{r}
+iran <- wdiData %>% filter(Country.Code == "IRN" & Indicator.Code == "SP.DYN.LE00.IN") %>% select(starts_with("X")) %>% t() %>% data.frame() %>% setDT(keep.rownames = T)
+colnames(iran) <- c("year","life")
+iran <- iran[1:57,]
+hcboxplot(x = lifeexp$value, var = lifeexp$variable,
+          name = "Length", color = "#2980b9")  %>% 
+  hc_chart(type = "column") %>% 
+hc_add_series(iran, "line", hcaes(x= year, y = life))
+```
+

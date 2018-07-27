@@ -1,0 +1,190 @@
+---
+title: "HW4 94104778"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(ggplot2)
+library(highcharter )
+```
+
+```{r}
+bcg <- readRDS("~/Downloads/bcg.rds")
+bsg <- readRDS("~/Downloads/bsg.rds")
+bsa <- readRDS("~/Downloads/bsa.rds")
+bsr <- readRDS("~/Downloads/bsr.rds")
+bst <- readRDS("~/Downloads/bst.rds")
+btm <- readRDS("~/Downloads/btm.rds")
+bts <- readRDS("~/Downloads/bts.rds")
+timss <- readRDS("~/Downloads/timss_2015.rds")
+```
+#Q2
+<p>
+By dividing the educated level to two groups named educated and less educated and then applying the t.test to these groups for both mother and father I obtained p-values below which show that there are siginficiant differences between the grades of students with more educated parents and less educated parents. I divided the levels of education based on college education. By dividing the levels to two groups, the number of students in each becomes more so test would be more valid.
+</p>
+
+```{r}
+grades <- bsg %>% mutate(grade = (bsmmat01 + bsmmat02+bsmmat03+bsmmat04+bsmmat05)/5)
+mergedgradeparent <- grades %>% select(grade = grade, motheredu = bsbg07a, fatheredu = bsbg07b)
+##college education
+educatedmother <- mergedgradeparent %>% filter(motheredu == 6 | motheredu == 7)
+educatedfather <- mergedgradeparent %>% filter(fatheredu == 6 | motheredu == 7)
+mergedgradeparent<- na.omit(mergedgradeparent)
+##no college education
+lesseducatedmother <- mergedgradeparent %>% filter(motheredu == 1 | motheredu == 2 | motheredu == 3 | motheredu == 4)
+lesseducatedfather <- mergedgradeparent %>% filter(fatheredu == 1 | motheredu == 2 | motheredu == 3| motheredu == 4)
+mergedgradeparent <- mergedgradeparent[!duplicated(mergedgradeparent), ]
+t.test(educatedmother$grade,lesseducatedmother$grade,alt = "two.sided")
+t.test(educatedfather$grade,lesseducatedfather$grade,alt = "two.sided")
+ggplot(mergedgradeparent,aes(x = grade,fill = motheredu >= 6)) +
+  geom_density(alpha= 0.4,na.rm = T) + labs(fill="college educated mother")
+ggplot(mergedgradeparent,aes(x = grade,fill = fatheredu >= 6)) +
+  geom_density(alpha= 0.4,na.rm = T) + labs(fill="college educated father")
+hchart(density(educatedmother$grade), type = "area",name = "more educated mother") %>% hc_add_series(density(lesseducatedmother$grade), type = "area",name = "less educated mother")
+hchart(density(educatedfather$grade), type = "area",name = "more educated father") %>% hc_add_series(density(lesseducatedfather$grade), type = "area",name = "less educated father")
+summary(aov(mergedgradeparent$grade ~ mergedgradeparent$motheredu, data = mergedgradeparent))
+```
+
+#Q10
+<p dir>
+According to p-value, we cant conclude that there is a significant difference between Iranian's reasoning and applying in both math and science. 
+</p>
+
+```{r}
+iran <- bsg %>% filter(idcntry == 364) %>% mutate(applyscore = ((bsmapp01 +  bsmapp02 + bsmapp03+ bsmapp04+ bsmapp05)/5 + (bssapp01+ bssapp02+ bssapp03+ bssapp04+ bssapp05)/5)/2 , reasonscore = (bsmrea01+ bsmrea02+ bsmrea03+ bsmrea04+ bsmrea05 + bssrea01+bssrea02+bssrea03+bssrea04+bssrea05)/10) 
+t.test(iran$applyscore, iran$reasonscore, alt = "less")
+ggplot(iran) + geom_density(aes(x = as.double(applyscore), fill = "apply score"),alpha = 0.4) + geom_density(aes(x = as.double(reasonscore), fill = "reason score"),alpha = 0.4)
+hchart(density(iran$applyscore), type = "area",name = "apply score") %>% hc_add_series(density(iran$reasonscore), type = "area",name = "reason score")
+```
+
+#Q9
+
+<p>
+According to p-value there is a significiant difference between grades of those student who participate more and those who participate less. I have divided the students to two groups one with once a week and once every two weeks which candidates for more absents and one with once a month and almost never which candidates for less absents.
+</p>
+
+```{r}
+absents <- grades %>% select(bsbg11, grade)
+absents <- na.omit(absents)
+moreabs <- absents %>% filter(bsbg11 == 1 | bsbg11 == 2)
+lessabs <- absents %>% filter(bsbg11 == 3 | bsbg11 == 4)
+t.test(moreabs$grade, lessabs$grade,alt = "two.sided")
+ggplot(absents) + geom_density(aes(x = grade, fill = bsbg11 == 1 | bsbg11 == 2))  + labs(fill="Less Participating")
+hchart(density(moreabs$grade), type = "area",name = "Students grade with more absents") %>% hc_add_series(density(lessabs$grade), type = "area",name = "Students grade with less absents")
+```
+
+#Q6
+<p dir>
+According to p-value we cant conlude that there is a significant difference between boys and girls in applyign geometry.
+</p>
+
+```{r}
+applyinggeo <- timss %>% filter(cognitive_domain == "Applying", content_domain == "Geometry")
+girls =applyinggeo  %>% select(correct_ratio_per_question_female)
+boys = applyinggeo %>% select(correct_ratio_per_question_male)
+t.test(boys,girls,alt = "two.sided")
+ggplot(applyinggeo) + geom_density(aes(x = correct_ratio_per_question_female,fill  = "Female",alpha = 0.4)) + geom_density(aes(x = correct_ratio_per_question_male,fill = "Male",alpha = 0.4)) + xlab("correct ratio")
+hchart(density(applyinggeo$correct_ratio_per_question_female), type = "area",name = "correct_ratio_per_question_female") %>% hc_add_series(density(applyinggeo$correct_ratio_per_question_male), type = "area", name = "correct_ratio_per_question_male")
+```
+
+#Q3
+<p>
+I have applied t-test and also correlation test on this data. It seems that there is no powerful linear relation between home facilities and grades of student according to correlation coeefficient that is -0.3. but p-value of t-test shows that there is a significiant difference  between grades of two groups.
+</p>
+
+```{r}
+homefac <- grades %>% mutate(homef = (bsbg06a + bsbg06b +bsbg06c+bsbg06d+bsbg06e+bsbg06f+bsbg06g)) %>% select(homef, grade)
+homefac<- na.omit(homefac)
+
+morefac <- homefac %>% filter(homef == 7 | homef == 8 | homef == 9 | homef == 10 )
+lessfac <- homefac %>% filter(homef == 11 | homef == 12 | homef == 13 | homef == 14 )
+t.test(morefac$grade, lessfac$grade,alt= "two.sided")
+cor.test(homefac$grade,homefac$homef, data = homefac)
+ggplot(homefac) + geom_density(aes(x = as.double(grade),fill  = homef == 7 | homef == 8 | homef == 9 | homef == 10 ,alpha = 0.4))  + xlab("Grade") + labs(fill="More home Facilities")
+hchart(density(morefac$grade), type = "area",name = "More home Facilities") %>% hc_add_series(density(lessfac$grade), type = "area",name = "Less home Facilities")
+```
+
+#Q4
+<p>
+According to the test and the p-value and also the chart we wee that grades of students who feel more safe at school are better than ones who don't. As we can see there is a more significiant difference between those who said that they are disagree a lot with feeling safe at school with other groups.
+</p>
+
+
+```{r}
+safety <- grades %>% select(bsbg15b, grade)
+safe <-aov(grades$grade ~ bsbg15b , data = safety)
+summary(safe)
+safety <- na.omit(safety)
+verysafe <- safety %>% filter(bsbg15b == 1)
+vsafe <- safety %>% filter(bsbg15b == 2)
+nsafe <- safety %>% filter(bsbg15b == 3)
+vnsafe <- safety %>% filter(bsbg15b == 4)
+
+hchart(density(verysafe$grade), type = "area",name = "very safe") %>% hc_add_series(density(vsafe$grade), type = "area",name = "safe") %>% hc_add_series(density(nsafe$grade), type = "area",name = "not safe") %>% hc_add_series(density(vnsafe$grade), type = "area",name = "very not safe")
+
+
+```
+
+#Q8
+<p>
+According to p-value there is a difference between mean grades of school with more facilites and the less ones, but this difference is not that too big and significiant. I divided the schools to two groups with more facilites and less facilites, as a consequence the number of elements in each group will increase and the test will be more valid. also the differences will be seen better.
+</p>
+
+```{r}
+meangradeschool <- grades %>% group_by(idschool,idcntry) %>% summarise(meanscore = mean(grade)) 
+fac <- bcg %>% mutate(schoolfac = (bcbg12+bcbg11a+bcbg11b+bcbg08a+bcbg08b+bcbg06a+bcbg06b)) %>%  select(idschool, idcntry, schoolfac)
+data <- merge(fac,meangradeschool, by= c("idschool", "idcntry"))
+data<- na.omit(data)
+
+lessfac <- data %>% filter(schoolfac == 14 |schoolfac == 13 |schoolfac == 12 | schoolfac == 11)
+morefac <- data %>% filter(schoolfac == 7 |schoolfac ==8 |schoolfac == 9 | schoolfac == 10)
+t.test(lessfac$meanscore, morefac$meanscore,alt = "two.sided")
+ggplot(data) + geom_density(aes(x = as.double(meanscore),fill  = schoolfac == 7 |schoolfac ==8 |schoolfac == 9 | schoolfac == 10 ,alpha = 0.4))  + xlab("Grade") + labs(fill="More School Facilities")
+hchart(density(lessfac$meanscore), type = "area",name = "Less school Facilities") %>% hc_add_series(density(morefac$meanscore), type = "area" , name = "More School Facilities")
+```
+
+<p>
+First Statment: Girls want to continue their education to higher level than boys. We will use Wilcoxon test to examine this statment. as we see the statment is true.
+</p>
+
+```{r}
+howfar <- grades %>% select(bsbg08, itsex)
+girlhowfar <- howfar %>% filter(itsex == 1)
+boyhowfar <- howfar%>% filter(itsex == 2)
+girlhowfar <- na.omit(girlhowfar)
+boyhowfar <- na.omit(boyhowfar)
+
+wilcox.test(girlhowfar$bsbg08, boyhowfar$bsbg08, alternative = "greater")
+mean(girlhowfar$bsbg08,na.rm = T)
+mean(boyhowfar$bsbg08,na.rm = T)
+hchart(density(girlhowfar$bsbg08), type = "area",name = "Girls") %>% hc_add_series(density(boyhowfar$bsbg08), type = "area",name = "Boys")
+
+```
+
+<p>
+Second Statment: Boys Are more interested in math than girls. and according to chart and p-value, both girls and boys are equally intrested in math.
+</p>
+
+```{r}
+mathinterest = grades %>% select(bsbm17c, itsex)
+girlintrested <- mathinterest %>% filter(itsex == 1)
+boyinterested <- mathinterest %>% filter(itsex == 2)
+girlintrested <- na.omit(girlintrested)
+boyinterested <- na.omit(boyinterested)
+wilcox.test(girlintrested$bsbm17c, boyinterested$bsbm17c, alternative = "two.sided")
+hchart(density(girlintrested$bsbm17c), type = "area",name = "Girls") %>% hc_add_series(density(boyinterested$bsbm17c), type = "area",name = "Boys")
+```
+<p>
+Accessing to Internet and using it lead to better grades. According to p-value, there is not a big and significiant difference between students who use internet for their lessons and those who don't.
+</p>
+```{r}
+internetusin = grades %>% mutate(internet = bsbg14a + bsbg14b +bsbg14c +bsbg14d +bsbg14e +bsbg14f) %>% select(grade,internet)
+lessuse <- internetusin %>% filter(internet == 12 | internet == 11 | internet == 10 | internet == 9)
+moreuse <- internetusin %>% filter(internet == 6 | internet == 7 | internet == 8 )
+t.test(lessuse$grade, moreuse$grade, alt = "two.sided")
+hchart(density(lessuse$grade), type = "area",name = "less use of internet") %>% hc_add_series(density(moreuse$grade), type = "area",name = "more use of internet")
+
+```
+

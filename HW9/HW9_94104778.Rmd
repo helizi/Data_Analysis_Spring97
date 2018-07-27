@@ -1,0 +1,263 @@
+---
+title: "HW904104778"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(stringr)
+library(dplyr)
+library(readr)
+library(highcharter)
+library(reshape2)
+library(tidyr)
+library(qcc)
+library(EBImage)
+library(quantmod)
+```
+
+## Q1
+
+For calculating profit in this question I subtracted Close value of last row in the interval from Open value from first row in the interval. Then I calculated the biggest profit in one year, two year and five year for every company and then select maximum of them for every sector.
+
+```{r message=FALSE, warning=FALSE}
+file_names <- list.files('~/Downloads/class_data/stock_dfs/') %>% str_replace('.csv', '')
+file_paths <- list.files('~/Downloads/class_data/stock_dfs/', full.names = TRUE)
+
+constituents <- read.csv('~/Downloads/class_data/constituents.csv')
+
+maxyearprofits <- data.frame()
+for (i in (1:length(file_paths))){
+  data <- read_csv(file_paths[i]) %>% select(Date, Close, Open)
+  data <- data %>% mutate(year = substring(as.character(data$Date),1,4)) 
+  maxyearprofit <- data %>% group_by(year) %>% summarise(totalyearprofit = last(Close) - first(Open)) %>% top_n(totalyearprofit, n = 1)
+  data <- data %>% mutate(twoyear = (as.numeric(year) - as.numeric(first(year))) %/% 2)
+  data <- data %>% mutate(fiveyear = (as.numeric(year) - as.numeric(first(year))) %/% 5)
+  maxtwoyearprofit <- data %>% group_by(twoyear) %>% summarise(totaltwoyearprofit = last(Close) - first(Open)) %>% top_n(totaltwoyearprofit, n = 1)
+    maxfiveyearprofit <- data %>% group_by(fiveyear) %>% summarise(totalfiveyearprofit = last(Close) - first(Open)) %>% top_n(totalfiveyearprofit, n = 1)
+  maxyearprofits <- rbind(maxyearprofits, data.frame(file_names[i], maxyearprofit, maxtwoyearprofit, maxfiveyearprofit))
+}
+
+
+colnames(maxyearprofits)[1] <- "Symbol"
+maxyearprofits<- maxyearprofits %>% inner_join(constituents, by = "Symbol" ) 
+oneyear <- maxyearprofits %>% group_by(Sector) %>% filter(totalyearprofit == max(totalyearprofit)) %>% select(Sector, totalyearprofit,Name)
+twoyear<- maxyearprofits %>% group_by(Sector) %>% filter(totaltwoyearprofit == max(totaltwoyearprofit))%>% select(Sector, totaltwoyearprofit,Name)
+fiveyear<-maxyearprofits %>% group_by(Sector) %>% filter(totalfiveyearprofit == max(totalfiveyearprofit))%>% select(Sector, totalfiveyearprofit,Name)
+oneyear
+twoyear
+fiveyear
+```
+## Q2
+
+According to p-value of t-test we can say that 13th of month does not have any effect on profit.
+```{r message=FALSE}
+thirtheen <- data.frame()
+notthirteen <- data.frame()
+for (i in (1:length(file_paths))){
+  data <- read_csv(file_paths[i]) %>% select(Date, Close, Open)
+  data <- data %>% mutate(day = substring(as.character(data$Date),9,10))
+  thirtheen <- rbind(thirtheen, data %>% filter(day == "13"))
+  notthirteen <-rbind(thirtheen, data %>% filter(day != "13"))
+}
+thirtheen <- thirtheen %>% mutate(profit = Close - Open)
+notthirteen <- notthirteen %>% mutate(profit = Close - Open)
+t.test(thirtheen$profit, notthirteen$profit)
+hchart(density(thirtheen$profit), type = "area",name = "13th of month profit") %>% hc_add_series(density(notthirteen$profit), type = "area",name = "not 13th of month profit")
+```
+
+##Q3
+
+It is for 13th of October of 2008 that according to google was simultaneous with financial crisis.
+
+```{r message=FALSE, warning=FALSE}
+joinedall <- data.frame()
+for (i in (1:length(file_paths))){
+  data <- read_csv(file_paths[i]) %>% select(Date, Volume)
+  data$Volume[1:2]
+  m = c(0, data$Volume[1:length(data$Volume)-1])
+  diff <- data$Volume - m
+  data <- cbind(data, diff)
+  
+  joinedall <- rbind(joinedall,data %>% select(Date, diff))
+}
+
+joinedall %>% group_by(Date) %>% summarise(sum = sum(abs(diff))) %>% top_n(sum, n = 1)
+
+```
+
+##Q4
+
+according to mean square error value the best value for k is 9.
+
+```{r message=FALSE, warning=FALSE}
+apple <-  read.csv('~/Downloads/class_data/stock_dfs/AAPL.csv') %>% select(Open)
+apple <- apple %>%  mutate(n = c(1:length(apple$Open)))
+for (k in (1:10)){
+  print(k)
+  left <- length(apple$Open) %% k
+  newOpen <- apple$Open[1:(length(apple$Open) - left)]
+  df <- as.data.frame(split(newOpen, 1:k))
+  if (k != 1){
+      Y <- apple %>% filter(n %% k == 1 & n != 1)  %>% select(Open)
+      if (nrow(df) > nrow(Y)){
+        df <- df[1:nrow(Y),]
+      }
+      df <- cbind(df, Y)
+      print(mean(summary(lm(Open~., data = df))$residuals^2))
+  }
+  if(k == 1){
+    df <- df[1:nrow(apple)-1,]
+    df <- cbind(df, apple$Open[2:nrow(apple)])
+      df <- data.frame(df)
+    
+      print(mean(summary(lm(V2~., data = df))$residuals^2))
+  }
+}
+
+
+```
+
+##Q5
+3 first principal components cover 80 percent of variance.
+
+```{r message=FALSE}
+firstdata <- read_csv(file_paths[1]) %>% select(Date, Open)
+colnames(firstdata)[2] <- file_names[1]
+for (i in 2:length(file_paths)){
+    data <- read_csv(file_paths[i]) %>% select(Date, Open)
+    colnames(data)[2] <- file_names[i]
+    firstdata <- inner_join(firstdata,data,by = "Date")
+}
+
+
+
+pcacmp <- prcomp(firstdata[,2:506], center = T, scale. = T)
+eigv = round(pcacmp$sdev^2/sum(pcacmp$sdev^2)*100, 2)
+eigv <- eigv[1:20]
+qcc::pareto.chart(eigv)
+
+```
+
+##Q6
+
+```{r message=FALSE}
+alldata <- data.frame()
+for (i in 1:length(file_paths)){
+    data <- read_csv(file_paths[i]) 
+    data <- data %>% mutate(Symbol = file_names[i])
+    alldata <- rbind(alldata, data)
+}
+
+alldata <- alldata %>% select(Symbol, Open,Date) %>% inner_join(constituents, by = "Symbol") %>% select( Sector, Open,Date) %>% group_by(Sector, Date) %>% summarise(mean = mean(Open))
+
+alldata <- dcast(alldata, Date ~ Sector)
+
+indexes <- read.csv('~/Downloads/class_data/indexes.csv')
+indexes$Date <- as.Date(indexes$Date)
+
+joinedalldata <- inner_join(indexes, alldata, by = "Date")
+joinedalldata$Date <- as.numeric(joinedalldata$Date)
+pca <- prcomp(joinedalldata, center = T, scale. = T)
+biplot(pca, cex = 0.8)
+```
+
+##Q7
+Using first principal component is not better than using previous Open values.
+```{r message=FALSE, warning=FALSE}
+Apple <- read.csv('~/Downloads/class_data/stock_dfs/AAPL.csv')
+applepca <- prcomp(Apple[,2:7], center = T, scale. = T)
+PC1 <- applepca$x[,1]
+Apple <- Apple %>%  mutate(n = c(1:length(Apple$Open)))
+
+for (k in (1:10)){
+  print(k)
+  left <- length(Apple$Open) %% k
+  newPC1 <- PC1[1:(length(Apple$Open) - left)]
+  df <- as.data.frame(split(newPC1, 1:k))
+  if (k != 1){
+      Y <- Apple %>% filter(n %% k == 1 & n != 1)  %>% select(Open)
+      if (nrow(df) > nrow(Y)){
+        df <- df[1:nrow(Y),]
+      }
+      df <- cbind(df, Y)
+      print(mean(summary(lm(Open~., data = df))$residuals^2))
+  }
+  if(k == 1){
+      df <- data.frame(cbind(PC1,Apple$Open))
+      print(mean(summary(lm(V2~., data = df))$residuals^2))
+  }
+}
+
+```
+
+##Q8
+
+```{r message=FALSE, warning=FALSE}
+library(h2o)
+library(data.table)
+h2o.init()
+SPX <- as.data.frame(getSymbols("^GSPC",auto.assign = FALSE, from = "2016-01-01"))
+SPX <- setDT(SPX, keep.rownames = TRUE)
+colnames(SPX)[1] <- c("Date")
+sp500 <- SPX %>% select(Date, GSPC.Open)
+sp500self <- sp500$GSPC.Open
+lenminusone <- length(sp500self)-1
+laggedsp500 <- c(0, sp500self[0:lenminusone])
+diff <- sp500self - laggedsp500
+sp500 <- sp500 %>% mutate(diff = ifelse(diff > 0, 1, 0))
+qqnorm(diff)
+
+
+pca_x = data.frame(pcacmp$x) %>% select(PC1:PC20)
+pca_x$Date = firstdata$Date
+
+sp500$Date <- as.Date(sp500$Date)
+traindata <- sp500 %>% inner_join(pca_x, by = "Date") %>% select(diff, PC1:PC20)
+
+htrain = as.h2o(traindata)
+hglm = h2o.glm(y = "diff", training_frame = htrain, family = "binomial", nfolds = 5)
+h2o.confusionMatrix(hglm)
+```
+
+##Q9
+it seem's that 412 is the best number for number of principal components. 
+```{r}
+library(jpeg)
+pic = flip(readImage("~/Desktop/download.jpeg"))
+r <- pic[,,1]
+g <- pic[,,2]
+b <- pic[,,3]
+picred <- prcomp(r, center = FALSE)
+picgreen <- prcomp(g, center = FALSE)
+picblue <- prcomp(b, center = FALSE)
+rgb.pca <- list(picred,picgreen, picblue)
+for (i in 1:412) {
+  pca.img <- sapply(rgb.pca, function(j) {
+    compressed.img <- j$x[,1:i] %*% t(j$rotation[,1:i])
+  }, simplify = 'array')
+  writeJPEG(pca.img, paste('~/Documents/Data Analysis/HW9/Pics/', round(i,0), '_components.jpg', sep = ''))
+}  
+  
+file.info("~/Desktop/download.jpeg")$size / 1000
+
+sizes <- c()
+for (i in 1:412) {
+  full.path <- paste('~/Documents/Data Analysis/HW9/Pics/', round(i,0), '_components.jpg', sep = '')
+  size <- file.info(full.path)$size / 1000
+  sizes <- c(sizes,size)
+}
+sizes <- data.frame(sizes)
+sizes <- cbind(1:412,sizes)
+colnames(sizes) <- c("n","size")
+hchart(sizes, "line",hcaes(x= n ,y = size))
+
+
+```
+
+##Q10
+
+First: Finding the company with biggest turnover
+Second: Finding the sector with biggest turnover
+Third: Study the changes in Computer companies stock during these years
+Forth: which companies lost their stock during these years and why
+Fifth: Is there any specific month or any interval of year which there is significant change in turnover?

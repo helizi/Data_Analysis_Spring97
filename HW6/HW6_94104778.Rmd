@@ -1,0 +1,121 @@
+---
+title: "Untitled"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(readr)
+library(highcharter)
+library(ggplot2)
+library(dplyr)
+library(car)
+library("Hmisc")
+library("tibble")
+library(lmtest)
+house <- read_csv("~/Downloads/house/train.csv")
+dic_var = read_delim("~/Downloads/house/dictionnaire_variables.csv",delim = ";") 
+ 
+```
+
+## Q1
+
+```{r}
+
+res2 <- rcorr(as.matrix(house[,sapply(house,is.numeric)] ), type = c("pearson","spearman"))
+data.frame(abs(res2$r)) %>% rownames_to_column() %>% select(SalePrice,rowname)  %>% arrange(desc(SalePrice)) %>% head(11)
+```
+
+## Q2
+<p>
+According to first row of plot TotalBsmtSF and GarageCars do not have a linear relationship with SalePrice. But other factors seem to have more linear relationship.
+</p>
+```{r}
+colnames(house)[44]<-"one1stFlrSF"
+tentop <- house %>% select(SalePrice,GarageCars,GarageArea,FullBath,GrLivArea,TotalBsmtSF,TotRmsAbvGrd,YearBuilt,YearRemodAdd,one1stFlrSF,OverallQual)
+plot(tentop)
+```
+
+
+
+## Q3
+
+
+```{r}
+
+fittedPrice = lm(SalePrice ~ GrLivArea + GarageCars + OverallQual + YearBuilt + YearRemodAdd +  TotRmsAbvGrd + GarageArea + FullBath+ TotalBsmtSF + one1stFlrSF, data = house)
+summary(fittedPrice)
+```
+
+## Q4
+<p>
+According to Residual vs Fitted plot, We can predict non-zero and big value of residual when our fitted value is large. for example when our fitted value is near 4e+05 we expect a non-zero residual near 2e^05 so our predictores are unable to explain the function compeletly. 
+According to second plot, Normal Q-Q we can conclude that our errors do not follor normal distribution. 
+</p>
+```{r}
+plot(fittedPrice)
+```
+
+## Q5 
+
+<p>
+r-squared shows us how much our data is close to fitted regression. the value of R squared is 77 percent and thus only 77 percent of the variance found in the response variable can be explained by predictors. and According to value of f statistics is much larger than 1 SalePrice depends on the predictors. 
+</p>
+
+```{r}
+summary(fittedPrice)$r.squared
+summary(fittedPrice)$fstatistic
+```
+
+
+## Q6
+
+<p>
+I deleted GarageArea and TotRmsAbvGrd because their p-values were higher than 0.05. 
+</p>
+
+```{r}
+revisedFittedPrice = lm(SalePrice ~ GrLivArea + GarageCars + OverallQual + YearBuilt + YearRemodAdd  + FullBath+ TotalBsmtSF + one1stFlrSF, data = house)
+summary(revisedFittedPrice)
+```
+
+## Q7
+From ACF plot we can conclude that our residuals are not autocorrelated. it shows that our instances are independence. 
+Residual VS fitted and Q-Q normal plots are same as Question number 4.
+```{r}
+plot(revisedFittedPrice) 
+acf(revisedFittedPrice$residuals)
+```
+
+## Q8
+
+I have used train function in caret library to apply k-fold cross validation with k = 5. according to result of the model root mean square error is 37860. 
+```{r}
+
+library(caret)
+train_control <- trainControl(method="cv", number=5)
+model <- train(SalePrice ~ GrLivArea + GarageCars + OverallQual + YearBuilt + YearRemodAdd  + FullBath+ TotalBsmtSF + one1stFlrSF, data=tentop, trControl=train_control, method="lm")
+print(model)
+```
+
+## Q9 
+
+According to scatterplots of we can guess that some relations are not linear and then change them with the most likely equation. 
+```{r}
+veryrevisedFittedPrice = lm(SalePrice ~ GrLivArea^2 + GarageCars^2 + exp(OverallQual) + YearBuilt^2 + YearRemodAdd^2   + TotalBsmtSF^2 + one1stFlrSF^2, data = house)
+summary(veryrevisedFittedPrice)
+
+```
+
+## Q10
+
+```{r}
+test = read.csv("~/Downloads/house/test.csv")
+colnames(test)[44]<-"one1stFlrSF"
+
+predict<- data.frame(test$Id) 
+predict$SalePrice <- predict(veryrevisedFittedPrice, test)
+colnames(predict) <- c("Id", "SalePrice")
+predict[is.na(predict)] <- 178680  
+write_csv(predict,"predict.csv")
+```
+
